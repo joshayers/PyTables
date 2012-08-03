@@ -143,7 +143,7 @@ def copyFile(srcfilename, dstfilename, overwrite=False, **kwargs):
 
 
 def openFile(filename, mode="r", title="", rootUEP="/", filters=None,
-             **kwargs):
+             threadsafe=False, **kwargs):
     """Open a PyTables (or generic HDF5) file and return a File object.
 
     Parameters
@@ -180,50 +180,52 @@ def openFile(filename, mode="r", title="", rootUEP="/", filters=None,
         properties are specified for these leaves. Besides, if you do not
         specify filter properties for child groups, they will inherit these
         ones, which will in turn propagate to child nodes.
+    threadsafe : bool, Optional
+        If True, the file handle will not be cached.  Each time the same file is
+        opened, a new File instance will be created.  Defaults to False.
 
     Notes
     -----
     In addition, it recognizes the names of parameters present in
-    :file:`tables/parameters.py` as additional keyword arguments.
-    See :ref:`parameter_files` for a detailed info on the supported
-    parameters.
+    :file:`tables/parameters.py` as additional keyword arguments.  See
+    :ref:`parameter_files` for a detailed info on the supported parameters.
 
     .. note::
 
-        If you need to deal with a large number of nodes in an
-        efficient way, please see :ref:`LRUOptim` for more info and
-        advices about the integrated node cache engine.
+        If you need to deal with a large number of nodes in an efficient way,
+        please see :ref:`LRUOptim` for more info and advices about the
+        integrated node cache engine.
 
     """
-
-    # Get the list of already opened files
-    ofiles = [fname for fname in _open_files]
-    if filename in ofiles:
-        filehandle = _open_files[filename]
-        omode = filehandle.mode
-        # 'r' is incompatible with everything except 'r' itself
-        if mode == 'r' and omode != 'r':
-            raise ValueError(
-                "The file '%s' is already opened, but "
-                "not in read-only mode (as requested)." % filename)
-        # 'a' and 'r+' are compatible with everything except 'r'
-        elif mode in ('a', 'r+') and omode == 'r':
-            raise ValueError(
-                "The file '%s' is already opened, but "
-                "in read-only mode.  Please close it before "
-                "reopening in append mode." % filename)
-        # 'w' means that we want to destroy existing contents
-        elif mode == 'w':
-            raise ValueError(
-                "The file '%s' is already opened.  Please "
-                "close it before reopening in write mode." % filename)
-        else:
-            # The file is already open and modes are compatible
-            # Increase the number of openings for this file
-            filehandle._open_count += 1
-            return filehandle
+    if not threadsafe:
+        # Get the list of already opened files
+        ofiles = [fname for fname in _open_files]
+        if filename in ofiles:
+            filehandle = _open_files[filename]
+            omode = filehandle.mode
+            # 'r' is incompatible with everything except 'r' itself
+            if mode == 'r' and omode != 'r':
+                raise ValueError(
+                    "The file '%s' is already opened, but "
+                    "not in read-only mode (as requested)." % filename)
+            # 'a' and 'r+' are compatible with everything except 'r'
+            elif mode in ('a', 'r+') and omode == 'r':
+                raise ValueError(
+                    "The file '%s' is already opened, but "
+                    "in read-only mode.  Please close it before "
+                    "reopening in append mode." % filename)
+            # 'w' means that we want to destroy existing contents
+            elif mode == 'w':
+                raise ValueError(
+                    "The file '%s' is already opened.  Please "
+                    "close it before reopening in write mode." % filename)
+            else:
+                # The file is already open and modes are compatible
+                # Increase the number of openings for this file
+                filehandle._open_count += 1
+                return filehandle
     # Finally, create the File instance, and return it
-    return File(filename, mode, title, rootUEP, filters, **kwargs)
+    return File(filename, mode, title, rootUEP, filters, threadsafe, **kwargs)
 
 
 class _AliveNodes(dict):
@@ -449,13 +451,15 @@ class File(hdf5Extension.File, object):
 
     ## </properties>
 
-    def __init__(self, filename, mode="r", title="",
-                 rootUEP="/", filters=None, **kwargs):
+    def __init__(self, filename, mode="r", title="", rootUEP="/", filters=None,
+                 threadsafe=False, **kwargs):
 
         self.filename = filename
         """The name of the opened file."""
         self.mode = mode
         """The mode in which the file was opened."""
+        self.threadsafe = threadsafe
+        """Whether the file was opened in thread safe mode."""
 
         # Expand the form '~user'
         path = os.path.expanduser(filename)
@@ -510,7 +514,8 @@ class File(hdf5Extension.File, object):
         """True if the underlying file os open, False otherwise."""
 
         # Append the name of the file to the global dict of files opened.
-        _open_files[self.filename] = self
+        if not self.threadsafe:
+            _open_files[self.filename] = self
 
         # Set the number of times this file has been opened to 1
         self._open_count = 1
@@ -2144,7 +2149,8 @@ Mark ``%s`` is older than the current mark. Use `redo()` or `goto()` instead."""
         # counter and return
         if self._open_count > 1:
             self._open_count -= 1
-            return
+            if not self.threadsafe:
+                return
 
         filename = self.filename
 
@@ -2168,14 +2174,15 @@ Mark ``%s`` is older than the current mark. Use `redo()` or `goto()` instead."""
 
         # Close the file
         self._closeFile()
+        # Delete the entry in the dictionary of opened files
+        if not self.threadsafe:
+            del _open_files[filename]
         # After the objects are disconnected, destroy the
         # object dictionary using the brute force ;-)
         # This should help to the garbage collector
         self.__dict__.clear()
         # Set the flag to indicate that the file is closed
         self.isopen = 0
-        # Delete the entry in the dictionary of opened files
-        del _open_files[filename]
 
 
     def __enter__(self):

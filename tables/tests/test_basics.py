@@ -2171,6 +2171,7 @@ class MultiThreadedFileAccessTestCase(common.PyTablesTestCase):
         test_file = openFile(self.test_file_path, mode='w')
         test_file.createCArray(test_file.root, 'test_array',
                                tables.Int64Atom(), (200, 200))
+        test_file.root.test_array[:, :] = numpy.ones((200, 200), 'i8') * 10
         test_file.close()
 
     def tearDown(self):
@@ -2184,6 +2185,9 @@ class MultiThreadedFileAccessTestCase(common.PyTablesTestCase):
             threads.append(t)
         for t in threads:
             t.join()
+        for t in threads:
+            numpy.testing.assert_array_equal(t.array,
+                                             numpy.ones((10, 10), 'i8') * 10)
 
 
 class ReadFileThread(threading.Thread):
@@ -2193,8 +2197,8 @@ class ReadFileThread(threading.Thread):
         self.file_path = file_path
 
     def run(self):
-        f = tables.openFile(self.file_path, mode='r')
-        f.root.test_array[8:12, 18:22]
+        f = tables.openFile(self.file_path, mode='r', threadsafe=True)
+        self.array = f.root.test_array[10:20, 10:20]
         f.close()
 
 
