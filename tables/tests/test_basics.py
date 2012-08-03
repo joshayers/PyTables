@@ -4,6 +4,8 @@ import os
 import tempfile
 import warnings
 import subprocess
+import shutil
+import threading
 
 try:
     import multiprocessing as mp
@@ -2161,6 +2163,40 @@ class StateTestCase(common.TempFileMixin, common.PyTablesTestCase):
         file2.close()
 
 
+class MultiThreadedFileAccessTestCase(common.PyTablesTestCase):
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.test_file_path = os.path.join(self.temp_dir, 'test.h5')
+        test_file = openFile(self.test_file_path, mode='w')
+        test_file.createCArray(test_file.root, 'test_array',
+                               tables.Int64Atom(), (200, 200))
+        test_file.close()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir)
+
+    def test_multi_thread_read(self):
+        threads = []
+        for i in xrange(75):
+            t = ReadFileThread(self.test_file_path)
+            t.start()
+            threads.append(t)
+        for t in threads:
+            t.join()
+
+
+class ReadFileThread(threading.Thread):
+
+    def __init__(self, file_path):
+        super(ReadFileThread, self).__init__()
+        self.file_path = file_path
+
+    def run(self):
+        f = tables.openFile(self.file_path, mode='r')
+        f.root.test_array[8:12, 18:22]
+        f.close()
+
 
 class FlavorTestCase(common.TempFileMixin, common.PyTablesTestCase):
 
@@ -2671,6 +2707,7 @@ def suite():
         theSuite.addTest(unittest.makeSuite(CheckFileTestCase))
         theSuite.addTest(unittest.makeSuite(PythonAttrsTestCase))
         theSuite.addTest(unittest.makeSuite(StateTestCase))
+        theSuite.addTest(unittest.makeSuite(MultiThreadedFileAccessTestCase))
         theSuite.addTest(unittest.makeSuite(FlavorTestCase))
         if blosc_avail:
             theSuite.addTest(unittest.makeSuite(BloscBigEndian))
