@@ -30,7 +30,7 @@ from tables.description import Col
 from tables.exceptions import HDF5ExtError
 from tables.conditions import call_on_recarr
 from tables.utilsExtension import (getNestedField, AtomFromHDF5Type,
-  createNestedType)
+                                   createNestedType, numpyToHDF5Type)
 from tables.utils import SizeType
 
 from utilsExtension cimport get_native_type
@@ -581,6 +581,37 @@ cdef class Table(Leaf):
 
     if ret < 0:
       raise HDF5ExtError("Problems reading records.")
+
+    # Convert some HDF5 types to NumPy after reading.
+    self._convertTypes(recarr, nrecords, 1)
+
+    return nrecords
+
+
+  # version of _read_records that outputs in the same byteorder as recarr
+  def _dummy(self, hsize_t start, hsize_t nrecords, ndarray recarr):
+    cdef void *rbuf
+    cdef int ret
+    cdef hid_t type_id
+
+    # Correct the number of records to read, if needed
+    if (start + nrecords) > self.nrows:
+      nrecords = self.nrows - start
+
+    # Get the pointer to the buffer data area
+    rbuf = recarr.data
+
+    type_id = numpyToHDF5Type(recarr.dtype)
+
+    # Read the records from disk
+    with nogil:
+        ret = H5TBOread_records(self.dataset_id, type_id, start,
+                                nrecords, rbuf)
+
+    if ret < 0:
+      raise HDF5ExtError("Problems reading records.")
+
+    H5Tclose(type_id)
 
     # Convert some HDF5 types to NumPy after reading.
     self._convertTypes(recarr, nrecords, 1)
