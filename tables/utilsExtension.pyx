@@ -1141,6 +1141,39 @@ def createNestedType(object desc, str byteorder):
   return tid
 
 
+def numpyToHDF5Type(object dtype):
+  """Create a HDF5 datatype based on a NumPy datatype.  The HDF5 datatype will
+  use the same byteorder as the NumPy datatype, not necessarily the system's
+  byteorder.
+  """
+  cdef hid_t tid, tid2
+  cdef size_t offset
+  cdef bytes encoded_name
+  cdef int col_num
+
+  tid = H5Tcreate(H5T_COMPOUND, dtype.itemsize)
+  if tid < 0:
+    return -1
+
+  offset = 0
+  col_num = -1
+  for name in dtype.names:
+    col_num += 1
+    dt_column = dtype[col_num]
+    if dt_column.names is None:
+      tid2 = H5Tcopy(NPTypeToHDF5[dt_column.str])
+    else:
+      tid2 = numpyToHDF5Type(dt_column)
+    encoded_name = name.encode('utf-8')
+    H5Tinsert(tid, encoded_name, offset, tid2)
+    offset += dt_column.itemsize
+    # Release resources
+    H5Tclose(tid2)
+
+  return tid
+
+
+
 ## Local Variables:
 ## mode: python
 ## py-indent-offset: 2

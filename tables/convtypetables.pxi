@@ -87,6 +87,14 @@ PTTypeToHDF5 = {
   'time32' : H5T_UNIX_D32, 'time64' : H5T_UNIX_D64,
   }
 
+NPTypeToHDF5 = {
+  '<i1':H5T_STD_I8LE, '<u1':H5T_STD_U8LE,
+  '<i4':H5T_STD_I32LE, '<u4':H5T_STD_U32LE,
+  '>i4':H5T_STD_I32BE, '>u4':H5T_STD_U32BE,
+  '<i8':H5T_STD_I64LE, '<u8':H5T_STD_U64LE,
+  '>i8':H5T_STD_I64BE, '>u8':H5T_STD_U64BE
+  }
+
 # Special cases whose byteorder cannot be directly changed
 PTSpecialKinds = ['complex', 'string', 'enum', 'bool']
 
