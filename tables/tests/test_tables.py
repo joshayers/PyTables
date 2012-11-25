@@ -1642,8 +1642,10 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
     def setUp(self):
         self.system_byteorder = sys.byteorder
         self.other_byteorder = {'little':'big', 'big':'little'}[sys.byteorder]
-        self.reverse_byteorders = {'little':'<', 'big':'>'}
-        self.dt_codes = ['i2', 'u2', 'i4', 'u4', 'i8', 'u8', 'f4', 'f8']
+        self.reverse_byteorders = {'little':'<', 'big':'>', None:''}
+        self.byteorder_dependent_dt_codes = ['i2', 'u2', 'i4', 'u4', 'i8', 'u8',
+                                             'f4', 'f8', 'c8', 'c16']
+        self.byteorder_independent_dt_codes = ['b1', 'i1', 'u1', 'S3']
 
     def create_table(self, fileh, dt_code, table_byteorder):
         itemsize = np.dtype(dt_code).itemsize
@@ -1660,10 +1662,10 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
         return table, input_array
 
     def loop_through_dt_codes_no_out_argument(self, table_byteorder):
-        for dt_code in self.dt_codes:
+        for dt_code in self.byteorder_dependent_dt_codes:
             try:
                 fid = tempfile.mktemp(".h5")
-                fileh = openFile(fid, mode = "w")
+                fileh = openFile(fid, mode="w")
                 table, array = self.create_table(fileh, dt_code,
                                                  table_byteorder)
                 output = table.read()
@@ -1682,10 +1684,10 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
 
     def loop_through_dt_codes_out_argument(self, table_byteorder,
                                            output_byteorder):
-        for dt_code in self.dt_codes:
+        for dt_code in self.byteorder_dependent_dt_codes:
             try:
                 fid = tempfile.mktemp(".h5")
-                fileh = openFile(fid, mode = "w")
+                fileh = openFile(fid, mode="w")
                 table, array = self.create_table(fileh, dt_code,
                                                  table_byteorder)
                 output_dt_code = (self.reverse_byteorders[output_byteorder] +
@@ -1715,6 +1717,22 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
     def test_table_other_byteorder_out_argument_other_byteorder(self):
         self.loop_through_dt_codes_out_argument(self.other_byteorder,
                                                 self.other_byteorder)
+
+    def test_byteorder_independent_dtypes(self):
+        for dt_code in self.byteorder_independent_dt_codes:
+            try:
+                fid = tempfile.mktemp(".h5")
+                fileh = openFile(fid, mode="w")
+                table, array = self.create_table(fileh, dt_code, None)
+                output_dtype = np.format_parser([dt_code], [], [])
+                output = np.empty((10, ), output_dtype)
+                table.read(out=output)
+                allequal(output['f0'], array['f0'])
+                output2 = table.read()
+                allequal(output2['f0'], array['f0'])
+            finally:
+                fileh.close()
+                os.remove(fid)
 
 
 class BasicRangeTestCase(unittest.TestCase):

@@ -87,6 +87,7 @@ PTTypeToHDF5 = {
   'time32' : H5T_UNIX_D32, 'time64' : H5T_UNIX_D64,
   }
 
+# Conversion from NumPy string dtypes to HDF5 types
 NPTypeToHDF5 = {
   '|b1':H5T_STD_B8,
   '|i1':H5T_STD_I8, '|u1':H5T_STD_U8,

@@ -28,7 +28,7 @@ from tables.misc.enum import Enum
 from tables.exceptions import HDF5ExtError
 from tables.atom import Atom, EnumAtom
 
-from tables.utils import checkFileAccess
+from tables.utils import checkFileAccess, byteorders
 
 from cpython cimport PY_MAJOR_VERSION
 from libc.stdio cimport stderr
@@ -1162,6 +1162,8 @@ cpdef hid_t NestedNPToHDF5Type(object dtype):
     dt_column = dtype[col_num]
     if dt_column.names is None:
       tid2 = NPToHDF5Type(dt_column.str, dt_column)
+      if tid2 == -1:
+          raise TypeError('Unsupported dtype: ' + dt_column.str)
     else:
       tid2 = NestedNPToHDF5Type(dt_column)
     encoded_name = name.encode('utf-8')
@@ -1176,19 +1178,27 @@ cpdef hid_t NestedNPToHDF5Type(object dtype):
 cdef hid_t NPToHDF5Type(str dtype_str, object dtype):
 
   cdef hid_t tid = -1
+  cdef bytes encoded_byteorder
+  cdef char *cbyteorder = NULL
 
   if dtype_str in NPTypeToHDF5:
     return H5Tcopy(NPTypeToHDF5[dtype_str])
-  elif dtype_str[1:] == 'f2':
+
+  encoded_byteorder = byteorders[dtype.byteorder].encode('UTF-8')
+  cbyteorder = encoded_byteorder
+
+  if dtype_str[1:] == 'f2':
     return -1
   elif dtype_str[1:] == 'c8':
-    return -1
+    return create_ieee_complex64(cbyteorder)
   elif dtype_str[1:] == 'c16':
-    return -1
-  elif dtype_str[1] == 'a':
+    return create_ieee_complex128(cbyteorder)
+  elif dtype_str[1] == 'S':
     tid = H5Tcopy(H5T_C_S1)
     H5Tset_size(tid, dtype.itemsize)
     return tid
+  else:
+    return -1
 
 
 ## Local Variables:
