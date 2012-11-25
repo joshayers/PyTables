@@ -804,7 +804,7 @@ class ReadTestCase(common.TempFileMixin, common.PyTablesTestCase):
             print "Read cols:", tblcols
             print "Should look like:", nrarrcols
         self.assertTrue(common.areArraysEqual(nrarrcols, tblcols),
-                        "Original array are retrieved doesn't match.")
+                        "Original array and retrieved array do not match.")
         self.assertTrue(common.areArraysEqual(nrarr[0::2], all_cols),
                         "Output buffer does not match full table.")
 

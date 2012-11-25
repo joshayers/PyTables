@@ -30,7 +30,8 @@ from tables.description import Col
 from tables.exceptions import HDF5ExtError
 from tables.conditions import call_on_recarr
 from tables.utilsExtension import (getNestedField, AtomFromHDF5Type,
-                                   createNestedType, NestedNPToHDF5Type)
+                                   createNestedType,
+                                   createNestedTypeMatchByteorder)
 from tables.utils import SizeType
 
 from utilsExtension cimport get_native_type
@@ -578,7 +579,7 @@ cdef class Table(Leaf):
 
     # Get datatype id of the output
     if use_sys_byteorder == 0:
-      type_id = NestedNPToHDF5Type(recarr.dtype)
+      type_id = createNestedTypeMatchByteorder(self.description, recarr.dtype)
     else:
       type_id = self.type_id
 

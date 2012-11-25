@@ -47,7 +47,7 @@ from definitions cimport (hid_t, herr_t, hsize_t, hssize_t, htri_t,
   H5E_auto_t, H5Eset_auto, H5Eprint, H5Eget_msg,
   H5E_error_t, H5E_walk_t, H5Ewalk, H5E_WALK_DOWNWARD, H5E_DEFAULT,
   H5D_layout_t, H5Dopen, H5Dclose, H5Dget_type,
-  H5T_class_t, H5T_sign_t, H5Tcreate, H5Tcopy, H5Tclose,
+  H5T_class_t, H5T_sign_t, H5Tcreate, H5Tcopy, H5Tclose
   H5Tget_nmembers, H5Tget_member_name, H5Tget_member_type,
   H5Tget_member_value, H5Tget_size, H5Tget_native_type,
   H5Tget_class, H5Tget_super, H5Tget_sign, H5Tget_offset, H5Tget_precision,
@@ -861,7 +861,7 @@ def enumToHDF5(object enumAtom, str byteorder):
   npValues = enumAtom._values
   bytestride = npValues.strides[0]
   rbuffer = npValues.data
-  for i from 0 <= i < len(npNames):
+  for i in range(len(npNames)):
     name = npNames[i].encode('utf-8')
     rbuf = <void *>(<char *>rbuffer + bytestride * i)
     if H5Tenum_insert(enumId, name, rbuf) < 0:
@@ -1121,83 +1121,136 @@ cpdef hid_t createNestedType(object desc, str byteorder) except -1:
   cdef hid_t tid, tid2
   cdef size_t offset
   cdef bytes encoded_name
+  cdef object name
 
   tid = H5Tcreate(H5T_COMPOUND, desc._v_itemsize)
   if tid < 0:
     return -1
 
   offset = 0
-  for k in desc._v_names:
-    obj = desc._v_colObjects[k]
+  for name in desc._v_names:
+    obj = desc._v_colObjects[name]
     if isinstance(obj, Description):
       tid2 = createNestedType(obj, byteorder)
     else:
       tid2 = AtomToHDF5Type(obj, byteorder)
-    encoded_name = k.encode('utf-8')
+    encoded_name = name.encode('utf-8')
     H5Tinsert(tid, encoded_name, offset, tid2)
-    offset = offset + desc._v_dtype[k].itemsize
+    offset += desc._v_dtype[name].itemsize
     # Release resources
     H5Tclose(tid2)
 
   return tid
 
 
-cpdef hid_t NestedNPToHDF5Type(object dtype) except -1:
-  """Create a HDF5 datatype based on a NumPy datatype.  The HDF5 datatype will
-  use the same byteorder as the NumPy datatype, not necessarily the system's
-  byteorder.
-  """
-  cdef hid_t tid, tid2
-  cdef size_t offset
-  cdef bytes encoded_name
-  cdef int col_num
+cpdef hid_t createNestedTypeMatchByteorder(object desc, object dtype) except -1:
+  """Create a nested type based on a description and return an HDF5 type.
+  The byteorder of each column will match the corresponding column in dtype"""
 
-  tid = H5Tcreate(H5T_COMPOUND, dtype.itemsize)
+  cdef hid_t tid, tid2
+  cdef size_t offset, itemsize
+  cdef int col_num
+  cdef bytes encoded_name
+  cdef object desc_col, dt_col, name
+
+  tid = H5Tcreate(H5T_COMPOUND, desc._v_itemsize)
   if tid < 0:
     return -1
 
   offset = 0
-  col_num = -1
-  for name in dtype.names:
-    col_num += 1
-    dt_column = dtype[col_num]
-    if dt_column.names is None:
-      tid2 = NPToHDF5Type(dt_column.str, dt_column)
+  col_num = 0
+  for name in desc._v_names:
+    desc_col = desc._v_colObjects[name]
+    dt_col = dtype[col_num]
+    itemsize = dt_col.itemsize
+    if dt_col.shape != ():
+        dt_col = dt_col.subdtype[0]
+    if isinstance(desc_col, Description):
+      tid2 = createNestedTypeMatchByteorder(desc_col, dt_col)
     else:
-      tid2 = NestedNPToHDF5Type(dt_column)
+      tid2 = AtomToHDF5Type(desc_col, byteorders[dt_col.byteorder])
     encoded_name = name.encode('utf-8')
     H5Tinsert(tid, encoded_name, offset, tid2)
-    offset += dt_column.itemsize
+    offset += itemsize
     # Release resources
     H5Tclose(tid2)
+    col_num += 1
 
   return tid
 
 
-cdef hid_t NPToHDF5Type(str dtype_str, object dtype) except -1:
-
-  cdef hid_t tid = -1
-  cdef bytes encoded_byteorder
-  cdef char *cbyteorder = NULL
-
-  if dtype_str in NPTypeToHDF5:
-    return H5Tcopy(NPTypeToHDF5[dtype_str])
-
-  encoded_byteorder = byteorders[dtype.byteorder].encode('UTF-8')
-  cbyteorder = encoded_byteorder
-
-  if dtype_str[1:] == 'f2':
-    return -1
-  elif dtype_str[1:] == 'c8':
-    return create_ieee_complex64(cbyteorder)
-  elif dtype_str[1:] == 'c16':
-    return create_ieee_complex128(cbyteorder)
-  elif dtype_str[1] == 'S':
-    tid = H5Tcopy(H5T_C_S1)
-    H5Tset_size(tid, dtype.itemsize)
-    return tid
-  else:
-    return -1
+# cpdef hid_t NestedNPToHDF5Type(object dtype) except -1:
+#   """Create a HDF5 datatype based on a NumPy datatype.  The HDF5 datatype will
+#   use the same byteorder as the NumPy datatype, not necessarily the system's
+#   byteorder.
+#   """
+#   cdef hid_t tid, tid2
+#   cdef size_t offset
+#   cdef bytes encoded_name
+#   cdef int col_num
+#
+#   tid = H5Tcreate(H5T_COMPOUND, dtype.itemsize)
+#   if tid < 0:
+#     return -1
+#
+#   offset = 0
+#   col_num = -1
+#   for name in dtype.names:
+#     col_num += 1
+#     dt_column = dtype[col_num]
+#     if dt_column.names is None:
+#       tid2 = NPToHDF5Type(dt_column)
+#     else:
+#       tid2 = NestedNPToHDF5Type(dt_column)
+#     encoded_name = name.encode('utf-8')
+#     H5Tinsert(tid, encoded_name, offset, tid2)
+#     offset += dt_column.itemsize
+#     # Release resources
+#     H5Tclose(tid2)
+#
+#   return tid
+#
+#
+# cpdef hid_t NPToHDF5Type(object dtype) except -1:
+#
+#   cdef str dtype_str
+#   cdef tuple shape = dtype.shape
+#   cdef hid_t tid = -1
+#   cdef hid_t tid2
+#   cdef bytes encoded_byteorder
+#   cdef char *cbyteorder
+#
+#   if shape != ():
+#     dtype = dtype.subdtype[0]
+#
+#   dtype_str = dtype.str
+#
+#   encoded_byteorder = byteorders[dtype.byteorder].encode('UTF-8')
+#   cbyteorder = encoded_byteorder
+#
+#   if dtype_str in NPTypeToHDF5:
+#     tid = H5Tcopy(NPTypeToHDF5[dtype_str])
+#   elif dtype_str[1:] == 'f2':
+#     tid = create_ieee_float16(cbyteorder)
+#   elif dtype_str[1:] == 'c8':
+#     tid = create_ieee_complex64(cbyteorder)
+#   elif dtype_str[1:] == 'c16':
+#     tid = create_ieee_complex128(cbyteorder)
+#   elif dtype_str[1] == 'S':
+#     tid = H5Tcopy(H5T_C_S1)
+#     H5Tset_size(tid, dtype.itemsize)
+#   else:
+#     return -1
+#
+#   # Create an H5T_ARRAY if dtype is non-scalar
+#   if shape != ():
+#     dims = malloc_dims(shape)
+#     tid2 = H5Tarray_create(tid, len(shape), dims)
+#     free(dims)
+#     H5Tclose(tid)
+#     tid = tid2
+#
+#   return tid
 
 
 ## Local Variables:
