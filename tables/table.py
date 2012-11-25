@@ -1718,12 +1718,7 @@ class Table(tableExtension.Table, Leaf):
                 # Recarray case
                 result = self._get_container(nrows)
         else:
-            if out.dtype.isnative:
-                use_sys_byteorder = 1
-            else:
-                use_sys_byteorder = 0
-#                 raise ValueError(("output array must be in system's byteorder "
-#                                   "or results will be incorrect"))
+            use_sys_byteorder = 0
             if field:
                 bytes_required = dtypeField.itemsize * nrows
             else:

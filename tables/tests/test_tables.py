@@ -1697,7 +1697,12 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 table.read(out=output)
                 self.assertEqual(byteorders[output['f0'].dtype.byteorder],
                                  output_byteorder)
-                allequal(output['f0'], array['f0'])
+                if table_byteorder != output_byteorder:
+                    array2 = np.empty(len(output), array.dtype.newbyteorder())
+                    array2['f0'] = array['f0']
+                else:
+                    array2 = array
+                npt.assert_array_equal(output['f0'], array2['f0'])
             finally:
                 fileh.close()
                 os.remove(fid)

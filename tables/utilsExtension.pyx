@@ -1114,8 +1114,9 @@ def AtomFromHDF5Type(hid_t type_id, pure_numpy_types=False):
   return atom_
 
 
-def createNestedType(object desc, str byteorder):
-  """Create a nested type based on a description and return an HDF5 type."""
+cpdef hid_t createNestedType(object desc, str byteorder) except -1:
+  """Create a nested type based on a description and return an HDF5 type.
+  The HDF5 type will be in the specified byteorder"""
 
   cdef hid_t tid, tid2
   cdef size_t offset
@@ -1141,7 +1142,7 @@ def createNestedType(object desc, str byteorder):
   return tid
 
 
-cpdef hid_t NestedNPToHDF5Type(object dtype):
+cpdef hid_t NestedNPToHDF5Type(object dtype) except -1:
   """Create a HDF5 datatype based on a NumPy datatype.  The HDF5 datatype will
   use the same byteorder as the NumPy datatype, not necessarily the system's
   byteorder.
@@ -1162,8 +1163,6 @@ cpdef hid_t NestedNPToHDF5Type(object dtype):
     dt_column = dtype[col_num]
     if dt_column.names is None:
       tid2 = NPToHDF5Type(dt_column.str, dt_column)
-      if tid2 == -1:
-          raise TypeError('Unsupported dtype: ' + dt_column.str)
     else:
       tid2 = NestedNPToHDF5Type(dt_column)
     encoded_name = name.encode('utf-8')
@@ -1175,7 +1174,7 @@ cpdef hid_t NestedNPToHDF5Type(object dtype):
   return tid
 
 
-cdef hid_t NPToHDF5Type(str dtype_str, object dtype):
+cdef hid_t NPToHDF5Type(str dtype_str, object dtype) except -1:
 
   cdef hid_t tid = -1
   cdef bytes encoded_byteorder
