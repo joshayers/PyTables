@@ -1709,6 +1709,7 @@ class Table(tableExtension.Table, Leaf):
         nrows = len(xrange(start, stop, step))
 
         if out is None:
+            use_sys_byteorder = 1
             # Compute the shape of the resulting column object
             if field:
                 # Create a container for the results
@@ -1717,11 +1718,12 @@ class Table(tableExtension.Table, Leaf):
                 # Recarray case
                 result = self._get_container(nrows)
         else:
-            # there is no fast way to byteswap, since different columns may have
-            # different byteorders
-            if not out.dtype.isnative:
-                raise ValueError(("output array must be in system's byteorder "
-                                  "or results will be incorrect"))
+            if out.dtype.isnative:
+                use_sys_byteorder = 1
+            else:
+                use_sys_byteorder = 0
+#                 raise ValueError(("output array must be in system's byteorder "
+#                                   "or results will be incorrect"))
             if field:
                 bytes_required = dtypeField.itemsize * nrows
             else:
@@ -1738,7 +1740,7 @@ class Table(tableExtension.Table, Leaf):
         if step == 1 and not field:
             # This optimization works three times faster than
             # the row._fillCol method (up to 170 MB/s on a pentium IV @ 2GHz)
-            self._read_records(start, stop-start, result)
+            self._read_records(start, stop - start, result, use_sys_byteorder)
         # Warning!: _read_field_name should not be used until
         # H5TBread_fields_name in tableExtension will be finished
         # F. Alted 2005/05/26

@@ -1637,85 +1637,84 @@ class NonNestedTableReadTestCase(unittest.TestCase):
             self.assertTrue('output array size invalid, got' in str(exc))
 
 
-class TableReadByteorderTestCase(unittest.TestCase):
+class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
 
     def setUp(self):
-        self.file = tempfile.mktemp(".h5")
-        self.fileh = openFile(self.file, mode = "w")
         self.system_byteorder = sys.byteorder
         self.other_byteorder = {'little':'big', 'big':'little'}[sys.byteorder]
         self.reverse_byteorders = {'little':'<', 'big':'>'}
+        self.dt_codes = ['i2', 'u2', 'i4', 'u4', 'i8', 'u8', 'f4', 'f8']
 
-    def tearDown(self):
-        self.fileh.close()
-        os.remove(self.file)
+    def create_table(self, fileh, dt_code, table_byteorder):
+        itemsize = np.dtype(dt_code).itemsize
+        num_rows = 10
+        table_dtype_code = self.reverse_byteorders[table_byteorder] + dt_code
+        table_dtype = np.format_parser([table_dtype_code], [], []).dtype
+        table = fileh.createTable('/', 'table', table_dtype,
+                                  byteorder=table_byteorder)
+        input_dtype = np.format_parser([dt_code], [], []).dtype
+        input_array = np.frombuffer(np.random.bytes(num_rows * itemsize),
+                                    input_dtype)
+        assert(len(input_array) == num_rows)
+        table.append(input_array)
+        return table, input_array
 
-    def create_table(self, byteorder):
-        table_dtype_code = self.reverse_byteorders[byteorder] + 'i4'
-        table_dtype = np.format_parser([table_dtype_code, 'a1'], [], []).dtype
-        self.table = self.fileh.createTable('/', 'table', table_dtype,
-                                            byteorder=byteorder)
-        input_dtype = np.format_parser(['i4', 'a1'], [], []).dtype
-        self.input_array = np.zeros((10, ), input_dtype)
-        self.input_array['f0'] = np.arange(10)
-        self.input_array['f1'] = b'a'
-        self.table.append(self.input_array)
+    def loop_through_dt_codes_no_out_argument(self, table_byteorder):
+        for dt_code in self.dt_codes:
+            try:
+                fid = tempfile.mktemp(".h5")
+                fileh = openFile(fid, mode = "w")
+                table, array = self.create_table(fileh, dt_code,
+                                                 table_byteorder)
+                output = table.read()
+                self.assertEqual(byteorders[output['f0'].dtype.byteorder],
+                                 self.system_byteorder)
+                npt.assert_array_equal(output['f0'], array['f0'])
+            finally:
+                fileh.close()
+                os.remove(fid)
 
     def test_table_system_byteorder_no_out_argument(self):
-        self.create_table(self.system_byteorder)
-        output = self.table.read()
-        self.assertEqual(byteorders[output['f0'].dtype.byteorder],
-                         self.system_byteorder)
-        npt.assert_array_equal(output['f0'], np.arange(10))
+        self.loop_through_dt_codes_no_out_argument(self.system_byteorder)
 
     def test_table_other_byteorder_no_out_argument(self):
-        self.create_table(self.other_byteorder)
-        output = self.table.read()
-        self.assertEqual(byteorders[output['f0'].dtype.byteorder],
-                         self.system_byteorder)
-        npt.assert_array_equal(output['f0'], np.arange(10))
+        self.loop_through_dt_codes_no_out_argument(self.other_byteorder)
+
+    def loop_through_dt_codes_out_argument(self, table_byteorder,
+                                           output_byteorder):
+        for dt_code in self.dt_codes:
+            try:
+                fid = tempfile.mktemp(".h5")
+                fileh = openFile(fid, mode = "w")
+                table, array = self.create_table(fileh, dt_code,
+                                                 table_byteorder)
+                output_dt_code = (self.reverse_byteorders[output_byteorder] +
+                                  dt_code)
+                output_dtype = np.format_parser([output_dt_code], [], [])
+                output = np.empty((10, ), output_dtype)
+                table.read(out=output)
+                self.assertEqual(byteorders[output['f0'].dtype.byteorder],
+                                 output_byteorder)
+                allequal(output['f0'], array['f0'])
+            finally:
+                fileh.close()
+                os.remove(fid)
 
     def test_table_system_byteorder_out_argument_system_byteorder(self):
-        self.create_table(self.system_byteorder)
-        out_dtype_code = self.reverse_byteorders[self.system_byteorder] + 'i4'
-        out_dtype = np.format_parser([out_dtype_code, 'a1'], [], []).dtype
-        output = np.empty((10, ), out_dtype)
-        self.table.read(out=output)
-        self.assertEqual(byteorders[output['f0'].dtype.byteorder],
-                         self.system_byteorder)
-        npt.assert_array_equal(output['f0'], np.arange(10))
+        self.loop_through_dt_codes_out_argument(self.system_byteorder,
+                                                self.system_byteorder)
 
     def test_table_other_byteorder_out_argument_system_byteorder(self):
-        self.create_table(self.other_byteorder)
-        out_dtype_code = self.reverse_byteorders[self.system_byteorder] + 'i4'
-        out_dtype = np.format_parser([out_dtype_code, 'a1'], [], []).dtype
-        output = np.empty((10, ), out_dtype)
-        self.table.read(out=output)
-        self.assertEqual(byteorders[output['f0'].dtype.byteorder],
-                         self.system_byteorder)
-        npt.assert_array_equal(output['f0'], np.arange(10))
+        self.loop_through_dt_codes_out_argument(self.other_byteorder,
+                                                self.system_byteorder)
 
     def test_table_system_byteorder_out_argument_other_byteorder(self):
-        self.create_table(self.system_byteorder)
-        out_dtype_code = self.reverse_byteorders[self.other_byteorder] + 'i4'
-        out_dtype = np.format_parser([out_dtype_code, 'a1'], [], []).dtype
-        output = np.empty((10, ), out_dtype)
-        self.assertRaises(ValueError, lambda: self.table.read(out=output))
-        try:
-            self.table.read(out=output)
-        except ValueError as exc:
-            self.assertTrue("array must be in system's byteorder" in str(exc))
+        self.loop_through_dt_codes_out_argument(self.system_byteorder,
+                                                self.other_byteorder)
 
     def test_table_other_byteorder_out_argument_other_byteorder(self):
-        self.create_table(self.other_byteorder)
-        out_dtype_code = self.reverse_byteorders[self.other_byteorder] + 'i4'
-        out_dtype = np.format_parser([out_dtype_code, 'a1'], [], []).dtype
-        output = np.empty((10, ), out_dtype)
-        self.assertRaises(ValueError, lambda: self.table.read(out=output))
-        try:
-            self.table.read(out=output)
-        except ValueError as exc:
-            self.assertTrue("array must be in system's byteorder" in str(exc))
+        self.loop_through_dt_codes_out_argument(self.other_byteorder,
+                                                self.other_byteorder)
 
 
 class BasicRangeTestCase(unittest.TestCase):
@@ -5937,7 +5936,7 @@ def suite():
         theSuite.addTest(unittest.makeSuite(CompressTwoTablesTestCase))
         theSuite.addTest(unittest.makeSuite(SizeOnDiskInMemoryPropertyTestCase))
         theSuite.addTest(unittest.makeSuite(NonNestedTableReadTestCase))
-        theSuite.addTest(unittest.makeSuite(TableReadByteorderTestCase))
+        theSuite.addTest(unittest.makeSuite(TableReadDtypeAndByteorderTestCase))
         theSuite.addTest(unittest.makeSuite(IterRangeTestCase))
         theSuite.addTest(unittest.makeSuite(RecArrayRangeTestCase))
         theSuite.addTest(unittest.makeSuite(getColRangeTestCase))

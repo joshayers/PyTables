@@ -30,7 +30,7 @@ from tables.description import Col
 from tables.exceptions import HDF5ExtError
 from tables.conditions import call_on_recarr
 from tables.utilsExtension import (getNestedField, AtomFromHDF5Type,
-                                   createNestedType, numpyToHDF5Type)
+                                   createNestedType, NestedNPToHDF5Type)
 from tables.utils import SizeType
 
 from utilsExtension cimport get_native_type
@@ -563,33 +563,8 @@ cdef class Table(Leaf):
     self._dirtycache = True
 
 
-  def _read_records(self, hsize_t start, hsize_t nrecords, ndarray recarr):
-    cdef void *rbuf
-    cdef int ret
-
-    # Correct the number of records to read, if needed
-    if (start + nrecords) > self.nrows:
-      nrecords = self.nrows - start
-
-    # Get the pointer to the buffer data area
-    rbuf = recarr.data
-
-    # Read the records from disk
-    with nogil:
-        ret = H5TBOread_records(self.dataset_id, self.type_id, start,
-                                nrecords, rbuf)
-
-    if ret < 0:
-      raise HDF5ExtError("Problems reading records.")
-
-    # Convert some HDF5 types to NumPy after reading.
-    self._convertTypes(recarr, nrecords, 1)
-
-    return nrecords
-
-
-  # version of _read_records that outputs in the same byteorder as recarr
-  def _dummy(self, hsize_t start, hsize_t nrecords, ndarray recarr):
+  def _read_records(self, hsize_t start, hsize_t nrecords, ndarray recarr,
+                    int use_sys_byteorder):
     cdef void *rbuf
     cdef int ret
     cdef hid_t type_id
@@ -601,17 +576,22 @@ cdef class Table(Leaf):
     # Get the pointer to the buffer data area
     rbuf = recarr.data
 
-    type_id = numpyToHDF5Type(recarr.dtype)
+    # Get datatype id of the output
+    if use_sys_byteorder == 0:
+      type_id = NestedNPToHDF5Type(recarr.dtype)
+    else:
+      type_id = self.type_id
 
     # Read the records from disk
     with nogil:
-        ret = H5TBOread_records(self.dataset_id, type_id, start,
-                                nrecords, rbuf)
+      ret = H5TBOread_records(self.dataset_id, type_id, start, nrecords, rbuf)
+
+    # Release the datatype id if a non-standard datatype id was used
+    if use_sys_byteorder == 0:
+      H5Tclose(type_id)
 
     if ret < 0:
       raise HDF5ExtError("Problems reading records.")
-
-    H5Tclose(type_id)
 
     # Convert some HDF5 types to NumPy after reading.
     self._convertTypes(recarr, nrecords, 1)
@@ -1073,7 +1053,7 @@ cdef class Row:
         self._row = self.startb - self.step
         # Read a chunk
         recout = self.table._read_records(self.nextelement, self.nrowsinbuf,
-                                          self.IObuf)
+                                          self.IObuf, 1)
         self.nrowsread = self.nrowsread + recout
         self.indexChunk = -self.step
 
@@ -1129,7 +1109,7 @@ cdef class Row:
         self._row = self.startb - self.step
         # Read a chunk
         recout = self.table._read_records(self.nrowsread, self.nrowsinbuf,
-                                          self.IObuf)
+                                          self.IObuf, 1)
         self.nrowsread = self.nrowsread + recout
 
       self._row = self._row + self.step
@@ -1186,7 +1166,7 @@ cdef class Row:
       stopr = startr + ((istopb - istartb - 1) / istep) + 1
       # Read a chunk
       inrowsread = inrowsread + self.table._read_records(i, inrowsinbuf,
-                                                         self.IObuf)
+                                                         self.IObuf, 1)
       # Assign the correct part to result
       fields = self.IObuf
       if field:
