@@ -845,6 +845,29 @@ class ReadTestCase(common.TempFileMixin, common.PyTablesTestCase):
         self.assertTrue(common.areArraysEqual(nrarrcols, tblcols),
                      "Original array are retrieved doesn't match.")
 
+    def test02_read_out_arg_other_byteorder(self):
+        """Checking Table.read with a nested Column."""
+
+        tbl = self.h5file.createTable('/', 'test', self._TestTDescr,
+                                      title=self._getMethodName())
+        tbl.append(self._testAData)
+
+        if self.reopen:
+            self._reopen()
+            tbl = self.h5file.root.test
+
+        if sys.byteorder == 'little':
+            dtype = '>f8'
+        elif sys.byteorder == 'big':
+            dtype = '<f8'
+        tblcols = numpy.empty(1, dtype=dtype)
+        tbl.read(start=0, step=2, field='Info/y2', out=tblcols)
+        nrarr = numpy.rec.array(testABuffer,
+                                dtype=tbl.description._v_nestedDescr)
+        nrarrcols = nrarr['Info']['y2'][0::2]
+        self.assertTrue(common.allequal(nrarrcols, tblcols),
+                        "Original array are retrieved doesn't match.")
+
 
 class ReadNoReopen(ReadTestCase):
     reopen = 0
@@ -1493,7 +1516,6 @@ def suite():
 
 if __name__ == '__main__':
     unittest.main( defaultTest='suite' )
-
 
 
 ## Local Variables:

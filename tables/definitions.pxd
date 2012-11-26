@@ -335,6 +335,7 @@ cdef extern from "hdf5.h" nogil:
   hid_t  H5Tvlen_create(hid_t base_type_id)
   hid_t  H5Tcopy(hid_t type_id)
   herr_t H5Tclose(hid_t type_id)
+  htri_t H5Tequal(hid_t dtype_id1, hid_t dtype_id2)
 
   # Operations defined on string data types
   htri_t H5Tis_variable_str(hid_t dtype_id)

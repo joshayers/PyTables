@@ -1644,7 +1644,7 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
         self.other_byteorder = {'little':'big', 'big':'little'}[sys.byteorder]
         self.reverse_byteorders = {'little':'<', 'big':'>', None:''}
         self.byteorder_dependent_dt_codes = ['i2', 'u2', 'i4', 'u4', 'i8', 'u8',
-                                             'f4', 'f8', 'c8', 'c16']
+                                             'f2', 'f4', 'f8', 'c8', 'c16']
         self.byteorder_independent_dt_codes = ['b1', 'i1', 'u1', 'S3']
 
     def create_table(self, fileh, dt_code, table_byteorder):
@@ -1656,7 +1656,13 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                                   byteorder=table_byteorder)
         input_dtype = np.format_parser([dt_code], [], []).dtype
         input_array = np.frombuffer(np.random.bytes(num_rows * itemsize),
-                                    input_dtype)
+                                    input_dtype).copy()
+        # npt.assert_array_equal fails on NANs for arrays of float16 dtype
+        # eliminate all NANs to prevent this error
+        # this seems to be fixed in NumPy 1.8dev as of 11/2012
+        if dt_code == 'f2':
+            indices = np.nonzero(np.isnan(input_array['f0']))[0]
+            input_array['f0'][indices] = 1
         assert(len(input_array) == num_rows)
         table.append(input_array)
         return table, input_array
@@ -1672,6 +1678,10 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 self.assertEqual(byteorders[output['f0'].dtype.byteorder],
                                  self.system_byteorder)
                 npt.assert_array_equal(output['f0'], array['f0'])
+                output2 = table.read(field='f0')
+                self.assertEqual(byteorders[output2.dtype.byteorder],
+                                 self.system_byteorder)
+                npt.assert_array_equal(output2, array['f0'])
             finally:
                 fileh.close()
                 os.remove(fid)
@@ -1690,6 +1700,13 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 fileh = openFile(fid, mode="w")
                 table, array = self.create_table(fileh, dt_code,
                                                  table_byteorder)
+                # byteswap array if necessary so the NumPy testing assertions
+                # can be used
+                if table_byteorder != output_byteorder:
+                    array2 = np.empty(len(array), array.dtype.newbyteorder())
+                    array2['f0'] = array['f0']
+                else:
+                    array2 = array
                 output_dt_code = (self.reverse_byteorders[output_byteorder] +
                                   dt_code)
                 output_dtype = np.format_parser([output_dt_code], [], [])
@@ -1697,12 +1714,12 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 table.read(out=output)
                 self.assertEqual(byteorders[output['f0'].dtype.byteorder],
                                  output_byteorder)
-                if table_byteorder != output_byteorder:
-                    array2 = np.empty(len(output), array.dtype.newbyteorder())
-                    array2['f0'] = array['f0']
-                else:
-                    array2 = array
                 npt.assert_array_equal(output['f0'], array2['f0'])
+                output2 = np.empty((10, ), output_dtype)['f0']
+                table.read(field='f0', out=output2)
+                self.assertEqual(byteorders[output2.dtype.byteorder],
+                                 output_byteorder)
+                npt.assert_array_equal(output2, array2['f0'])
             finally:
                 fileh.close()
                 os.remove(fid)
@@ -1732,9 +1749,14 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 output_dtype = np.format_parser([dt_code], [], [])
                 output = np.empty((10, ), output_dtype)
                 table.read(out=output)
-                allequal(output['f0'], array['f0'])
-                output2 = table.read()
-                allequal(output2['f0'], array['f0'])
+                npt.assert_array_equal(output['f0'], array['f0'])
+                output2 = np.empty((10, ), output_dtype)['f0']
+                table.read(field='f0', out=output2)
+                npt.assert_array_equal(output2, array['f0'])
+                output3 = table.read()
+                npt.assert_array_equal(output3['f0'], array['f0'])
+                output4 = table.read(field='f0')
+                npt.assert_array_equal(output4, array['f0'])
             finally:
                 fileh.close()
                 os.remove(fid)

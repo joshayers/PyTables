@@ -47,7 +47,7 @@ from definitions cimport (hid_t, herr_t, hsize_t, hssize_t, htri_t,
   H5E_auto_t, H5Eset_auto, H5Eprint, H5Eget_msg,
   H5E_error_t, H5E_walk_t, H5Ewalk, H5E_WALK_DOWNWARD, H5E_DEFAULT,
   H5D_layout_t, H5Dopen, H5Dclose, H5Dget_type,
-  H5T_class_t, H5T_sign_t, H5Tcreate, H5Tcopy, H5Tclose,
+  H5T_class_t, H5T_sign_t, H5Tcreate, H5Tcopy, H5Tclose, H5Tequal,
   H5Tget_nmembers, H5Tget_member_name, H5Tget_member_type,
   H5Tget_member_value, H5Tget_size, H5Tget_native_type,
   H5Tget_class, H5Tget_super, H5Tget_sign, H5Tget_offset, H5Tget_precision,
@@ -874,7 +874,7 @@ def enumToHDF5(object enumAtom, str byteorder):
   return enumId
 
 
-def AtomToHDF5Type(atom, str byteorder):
+cpdef hid_t AtomToHDF5Type(atom, str byteorder) except -1:
   cdef hid_t   tid = -1
   cdef hsize_t *dims = NULL
   cdef bytes   encoded_byteorder
@@ -906,7 +906,7 @@ def AtomToHDF5Type(atom, str byteorder):
     elif atom.kind == 'enum':
       tid = enumToHDF5(atom, byteorder)
   else:
-    raise TypeError("Invalid type for atom %s" % (atom,))
+    raise TypeError("Invalid type for atom {0}".format(atom))
   # Create an H5T_ARRAY in case of non-scalar atoms
   if atom.shape != ():
     dims = malloc_dims(atom.shape)
@@ -1125,7 +1125,7 @@ cpdef hid_t createNestedType(object desc, str byteorder) except -1:
 
   tid = H5Tcreate(H5T_COMPOUND, desc._v_itemsize)
   if tid < 0:
-    return -1
+    raise TypeError('Invalid datatype')
 
   offset = 0
   for name in desc._v_names:
@@ -1155,7 +1155,7 @@ cpdef hid_t createNestedTypeMatchByteorder(object desc, object dtype) except -1:
 
   tid = H5Tcreate(H5T_COMPOUND, desc._v_itemsize)
   if tid < 0:
-    return -1
+    raise TypeError('Invalid datatype')
 
   offset = 0
   col_num = 0
@@ -1168,6 +1168,7 @@ cpdef hid_t createNestedTypeMatchByteorder(object desc, object dtype) except -1:
     if isinstance(desc_col, Description):
       tid2 = createNestedTypeMatchByteorder(desc_col, dt_col)
     else:
+      # create a C-function equivalent of byteorders
       tid2 = AtomToHDF5Type(desc_col, byteorders[dt_col.byteorder])
     encoded_name = name.encode('utf-8')
     H5Tinsert(tid, encoded_name, offset, tid2)
@@ -1179,78 +1180,22 @@ cpdef hid_t createNestedTypeMatchByteorder(object desc, object dtype) except -1:
   return tid
 
 
-# cpdef hid_t NestedNPToHDF5Type(object dtype) except -1:
-#   """Create a HDF5 datatype based on a NumPy datatype.  The HDF5 datatype will
-#   use the same byteorder as the NumPy datatype, not necessarily the system's
-#   byteorder.
-#   """
-#   cdef hid_t tid, tid2
-#   cdef size_t offset
-#   cdef bytes encoded_name
-#   cdef int col_num
-#
-#   tid = H5Tcreate(H5T_COMPOUND, dtype.itemsize)
-#   if tid < 0:
-#     return -1
-#
-#   offset = 0
-#   col_num = -1
-#   for name in dtype.names:
-#     col_num += 1
-#     dt_column = dtype[col_num]
-#     if dt_column.names is None:
-#       tid2 = NPToHDF5Type(dt_column)
-#     else:
-#       tid2 = NestedNPToHDF5Type(dt_column)
-#     encoded_name = name.encode('utf-8')
-#     H5Tinsert(tid, encoded_name, offset, tid2)
-#     offset += dt_column.itemsize
-#     # Release resources
-#     H5Tclose(tid2)
-#
-#   return tid
-#
-#
-# cpdef hid_t NPToHDF5Type(object dtype) except -1:
-#
-#   cdef str dtype_str
-#   cdef tuple shape = dtype.shape
-#   cdef hid_t tid = -1
-#   cdef hid_t tid2
-#   cdef bytes encoded_byteorder
-#   cdef char *cbyteorder
-#
-#   if shape != ():
-#     dtype = dtype.subdtype[0]
-#
-#   dtype_str = dtype.str
-#
-#   encoded_byteorder = byteorders[dtype.byteorder].encode('UTF-8')
-#   cbyteorder = encoded_byteorder
-#
-#   if dtype_str in NPTypeToHDF5:
-#     tid = H5Tcopy(NPTypeToHDF5[dtype_str])
-#   elif dtype_str[1:] == 'f2':
-#     tid = create_ieee_float16(cbyteorder)
-#   elif dtype_str[1:] == 'c8':
-#     tid = create_ieee_complex64(cbyteorder)
-#   elif dtype_str[1:] == 'c16':
-#     tid = create_ieee_complex128(cbyteorder)
-#   elif dtype_str[1] == 'S':
-#     tid = H5Tcopy(H5T_C_S1)
-#     H5Tset_size(tid, dtype.itemsize)
-#   else:
-#     return -1
-#
-#   # Create an H5T_ARRAY if dtype is non-scalar
-#   if shape != ():
-#     dims = malloc_dims(shape)
-#     tid2 = H5Tarray_create(tid, len(shape), dims)
-#     free(dims)
-#     H5Tclose(tid)
-#     tid = tid2
-#
-#   return tid
+# these functions are only used by test_utils to compare and clean up
+# HDF5 datatypes
+
+def HDF5TypesEqual(hid_t dtype_id1, hid_t dtype_id2):
+  """Return 1 if the two HDF5 datatypes are equal.  Return zero if they are not
+  equal.
+  """
+  return H5Tequal(dtype_id1, dtype_id2)
+
+
+def CloseHDF5Type(hid_t dtype_id):
+  """Close an HDF5 datatype.
+  """
+  ret = H5Tclose(dtype_id)
+  if ret < 0:
+    raise HDF5ExtError('Unable to close dtype')
 
 
 ## Local Variables:
