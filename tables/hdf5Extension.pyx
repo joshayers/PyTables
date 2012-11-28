@@ -1411,10 +1411,11 @@ cdef class Array(Leaf):
 
 
   def _readArray(self, hsize_t start, hsize_t stop, hsize_t step,
-                 ndarray nparr):
+                 ndarray nparr, bint use_sys_byteorder):
     cdef herr_t ret
     cdef void *rbuf
     cdef hsize_t nrows
+    cdef hid_t type_id
     cdef int extdim
 
     # Get the pointer to the buffer data area
@@ -1427,15 +1428,23 @@ cdef class Array(Leaf):
     else:
       extdim = -1
 
+    if use_sys_byteorder:
+      type_id = self.type_id
+    else:
+      type_id = AtomToHDF5Type(self.atom, byteorders[nparr.dtype.byteorder])
+
     # Do the physical read
     with nogil:
-        ret = H5ARRAYread(self.dataset_id, self.type_id, start, nrows, step,
-                          extdim, rbuf)
+        ret = H5ARRAYread(self.dataset_id, type_id, start, nrows, step, extdim,
+                          rbuf)
+
+    if not use_sys_byteorder:
+      H5Tclose(type_id)
 
     if ret < 0:
       raise HDF5ExtError("Problems reading the array data.")
 
-    if self.atom.kind == 'time':
+    if use_sys_byteorder and self.atom.kind == 'time':
       # Swap the byteorder by hand (this is not currently supported by HDF5)
       if H5Tget_order(self.type_id) != platform_byteorder:
         nparr.byteswap(True)

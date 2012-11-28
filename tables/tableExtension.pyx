@@ -565,7 +565,7 @@ cdef class Table(Leaf):
 
 
   def _read_records(self, hsize_t start, hsize_t nrecords, ndarray recarr,
-                    int use_sys_byteorder):
+                    bint use_sys_byteorder):
     cdef void *rbuf
     cdef int ret
     cdef hid_t type_id
@@ -578,17 +578,17 @@ cdef class Table(Leaf):
     rbuf = recarr.data
 
     # Get datatype id of the output
-    if use_sys_byteorder == 0:
-      type_id = createNestedTypeMatchByteorder(self.description, recarr.dtype)
-    else:
+    if use_sys_byteorder:
       type_id = self.type_id
+    else:
+      type_id = createNestedTypeMatchByteorder(self.description, recarr.dtype)
 
     # Read the records from disk
     with nogil:
       ret = H5TBOread_records(self.dataset_id, type_id, start, nrecords, rbuf)
 
     # Release the datatype id if a non-standard datatype id was used
-    if use_sys_byteorder == 0:
+    if not use_sys_byteorder:
       H5Tclose(type_id)
 
     if ret < 0:
@@ -1054,7 +1054,7 @@ cdef class Row:
         self._row = self.startb - self.step
         # Read a chunk
         recout = self.table._read_records(self.nextelement, self.nrowsinbuf,
-                                          self.IObuf, 1)
+                                          self.IObuf, True)
         self.nrowsread = self.nrowsread + recout
         self.indexChunk = -self.step
 
@@ -1110,7 +1110,7 @@ cdef class Row:
         self._row = self.startb - self.step
         # Read a chunk
         recout = self.table._read_records(self.nrowsread, self.nrowsinbuf,
-                                          self.IObuf, 1)
+                                          self.IObuf, True)
         self.nrowsread = self.nrowsread + recout
 
       self._row = self._row + self.step
@@ -1167,7 +1167,7 @@ cdef class Row:
       stopr = startr + ((istopb - istartb - 1) / istep) + 1
       # Read a chunk
       inrowsread = inrowsread + self.table._read_records(i, inrowsinbuf,
-                                                         self.IObuf, 1)
+                                                         self.IObuf, True)
       # Assign the correct part to result
       fields = self.IObuf
       if field:

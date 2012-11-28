@@ -801,8 +801,10 @@ class Array(hdf5Extension.Array, Leaf):
         if shape:
             shape[self.maindim] = nrowstoread
         if out is None:
+            use_sys_byteorder = True
             arr = numpy.empty(dtype=self.atom.dtype, shape=shape)
         else:
+            use_sys_byteorder = False
             bytes_required = self.rowsize * nrowstoread
             # if buffer is too small, it will segfault
             if bytes_required != out.nbytes:
@@ -815,11 +817,7 @@ class Array(hdf5Extension.Array, Leaf):
         # Protection against reading empty arrays
         if 0 not in shape:
             # Arrays that have non-zero dimensionality
-            self._readArray(start, stop, step, arr)
-        # data is always read in the system byteorder
-        # if the out array's byteorder is different, do a byteswap
-        if out is not None and byteorders[arr.dtype.byteorder] != sys.byteorder:
-            arr.byteswap(True)
+            self._readArray(start, stop, step, arr, use_sys_byteorder)
         return arr
 
 

@@ -1674,10 +1674,12 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 fileh = openFile(fid, mode="w")
                 table, array = self.create_table(fileh, dt_code,
                                                  table_byteorder)
+                # read of all fields
                 output = table.read()
                 self.assertEqual(byteorders[output['f0'].dtype.byteorder],
                                  self.system_byteorder)
                 npt.assert_array_equal(output['f0'], array['f0'])
+                # read of one field
                 output2 = table.read(field='f0')
                 self.assertEqual(byteorders[output2.dtype.byteorder],
                                  self.system_byteorder)
@@ -1710,11 +1712,13 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 output_dt_code = (self.reverse_byteorders[output_byteorder] +
                                   dt_code)
                 output_dtype = np.format_parser([output_dt_code], [], [])
+                # read all fields
                 output = np.empty((10, ), output_dtype)
                 table.read(out=output)
                 self.assertEqual(byteorders[output['f0'].dtype.byteorder],
                                  output_byteorder)
                 npt.assert_array_equal(output['f0'], array2['f0'])
+                # read of one field
                 output2 = np.empty((10, ), output_dtype)['f0']
                 table.read(field='f0', out=output2)
                 self.assertEqual(byteorders[output2.dtype.byteorder],
@@ -1747,14 +1751,18 @@ class TableReadDtypeAndByteorderTestCase(unittest.TestCase):
                 fileh = openFile(fid, mode="w")
                 table, array = self.create_table(fileh, dt_code, None)
                 output_dtype = np.format_parser([dt_code], [], [])
+                # read of all fields, out argument
                 output = np.empty((10, ), output_dtype)
                 table.read(out=output)
                 npt.assert_array_equal(output['f0'], array['f0'])
+                # read of one field, out argument
                 output2 = np.empty((10, ), output_dtype)['f0']
                 table.read(field='f0', out=output2)
                 npt.assert_array_equal(output2, array['f0'])
+                # read of all fields
                 output3 = table.read()
                 npt.assert_array_equal(output3['f0'], array['f0'])
+                # read of one field
                 output4 = table.read(field='f0')
                 npt.assert_array_equal(output4, array['f0'])
             finally:

@@ -22,6 +22,9 @@ class Description1(tables.IsDescription):
         y = tables.Float64Col(dflt=1)
         z = tables.UInt8Col(dflt=1)
 
+        class info2(tables.IsDescription):
+            a = tables.EnumCol({'r':4, 'g':2, 'b':1}, 'r', 'int32', shape=2)
+
 
 class DummyClass(object):
     pass
@@ -39,7 +42,7 @@ class CreateNestedTypeTestCase(unittest.TestCase):
         self.fileh.close()
         os.remove(self.fid)
 
-    def test_invalid_size(self):
+    def test_invalid_v_itemsize(self):
         desc = DummyClass()
         desc._v_itemsize = 0
         self.assertRaises(TypeError, utilsExtension.createNestedType, desc,
@@ -75,7 +78,7 @@ class CreateNestedTypeTestCase(unittest.TestCase):
             self.assertTrue(isinstance(dtype2, np.dtype))
             self.assertEqual(dtype, dtype2)
 
-    def test_multiple_columns(self):
+    def test_multiple_non_nested_columns(self):
         dtype = np.format_parser(['i2', 'u2', 'i4', 'u4', 'i8', 'u8', 'f2',
                                   'f4', 'f8', 'c8', 'c16', 'b1', 'i1', 'u1',
                                   'S3'], [], []).dtype
@@ -87,15 +90,19 @@ class CreateNestedTypeTestCase(unittest.TestCase):
         self.opened_types.extend([tid1, tid2])
         self.assertTrue(utilsExtension.HDF5TypesEqual(tid1, tid2))
 
-    def test_nested(self):
-        description = 0
-
+    def test_nested_columns(self):
+        table = self.fileh.createTable('/', 'table', Description1)
+        description = table.description
+        tid1 = utilsExtension.createNestedType(description, sys.byteorder)
+        tid2 = utilsExtension.createNestedTypeMatchByteorder(description,
+                                                             table.dtype)
+        self.opened_types.extend([tid1, tid2])
+        self.assertTrue(utilsExtension.HDF5TypesEqual(tid1, tid2))
 
 
 def suite():
     theSuite = unittest.TestSuite()
     theSuite.addTest(unittest.makeSuite(CreateNestedTypeTestCase))
-
     return theSuite
 
 

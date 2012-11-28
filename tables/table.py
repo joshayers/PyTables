@@ -1709,7 +1709,7 @@ class Table(tableExtension.Table, Leaf):
         nrows = len(xrange(start, stop, step))
 
         if out is None:
-            use_sys_byteorder = 1
+            use_sys_byteorder = True
             # Compute the shape of the resulting column object
             if field:
                 # Create a container for the results
@@ -1718,7 +1718,7 @@ class Table(tableExtension.Table, Leaf):
                 # Recarray case
                 result = self._get_container(nrows)
         else:
-            use_sys_byteorder = 0
+            use_sys_byteorder = False
             if field:
                 bytes_required = dtypeField.itemsize * nrows
             else:
