@@ -564,8 +564,8 @@ cdef class Table(Leaf):
     self._dirtycache = True
 
 
-  def _read_records(self, hsize_t start, hsize_t nrecords, ndarray recarr,
-                    bint use_sys_byteorder):
+  cpdef hsize_t _read_records(self, hsize_t start, hsize_t nrecords,
+                              ndarray recarr, bint use_sys_byteorder) except -1:
     cdef void *rbuf
     cdef int ret
     cdef hid_t type_id
@@ -1054,7 +1054,7 @@ cdef class Row:
         self._row = self.startb - self.step
         # Read a chunk
         recout = self.table._read_records(self.nextelement, self.nrowsinbuf,
-                                          self.IObuf, True)
+                                          self.IObuf, 1)
         self.nrowsread = self.nrowsread + recout
         self.indexChunk = -self.step
 
@@ -1095,7 +1095,7 @@ cdef class Row:
   cdef __next__general(self):
     """The version of next() for the general cases"""
 
-    cdef int recout
+    cdef hsize_t recout
 
     self.nextelement = self._nrow + self.step
     while self.nextelement < self.stop:
@@ -1110,7 +1110,7 @@ cdef class Row:
         self._row = self.startb - self.step
         # Read a chunk
         recout = self.table._read_records(self.nrowsread, self.nrowsinbuf,
-                                          self.IObuf, True)
+                                          self.IObuf, 1)
         self.nrowsread = self.nrowsread + recout
 
       self._row = self._row + self.step
@@ -1167,7 +1167,7 @@ cdef class Row:
       stopr = startr + ((istopb - istartb - 1) / istep) + 1
       # Read a chunk
       inrowsread = inrowsread + self.table._read_records(i, inrowsinbuf,
-                                                         self.IObuf, True)
+                                                         self.IObuf, 1)
       # Assign the correct part to result
       fields = self.IObuf
       if field:
