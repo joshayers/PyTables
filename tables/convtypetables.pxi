@@ -87,20 +87,6 @@ PTTypeToHDF5 = {
   'time32' : H5T_UNIX_D32, 'time64' : H5T_UNIX_D64,
   }
 
-# Conversion from NumPy string dtypes to HDF5 types
-NPTypeToHDF5 = {
-  '|b1':H5T_STD_B8,
-  '|i1':H5T_STD_I8, '|u1':H5T_STD_U8,
-  '<i2':H5T_STD_I16LE, '<u2':H5T_STD_U16LE,
-  '>i2':H5T_STD_I16BE, '>u2':H5T_STD_U16BE,
-  '<i4':H5T_STD_I32LE, '<u4':H5T_STD_U32LE,
-  '>i4':H5T_STD_I32BE, '>u4':H5T_STD_U32BE,
-  '<i8':H5T_STD_I64LE, '<u8':H5T_STD_U64LE,
-  '>i8':H5T_STD_I64BE, '>u8':H5T_STD_U64BE,
-  '<f4':H5T_IEEE_F32LE, '<f8':H5T_IEEE_F64LE,
-  '>f4':H5T_IEEE_F32BE, '>f8':H5T_IEEE_F64BE
-  }
-
 # Special cases whose byteorder cannot be directly changed
 PTSpecialKinds = ['complex', 'string', 'enum', 'bool']
 
