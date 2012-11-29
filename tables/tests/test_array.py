@@ -388,6 +388,18 @@ class ReadOutArgumentTests(unittest.TestCase):
         disk_array.read(out=out_buffer)
         numpy.testing.assert_equal(out_buffer, array)
 
+    def test_read_entire_array_non_system_byteorder(self):
+        if sys.byteorder == 'little':
+            dtype = '>f8'
+        else:
+            dtype = '<f8'
+        array, disk_array = self.create_array()
+        out_buffer = numpy.empty((self.size, ), dtype)
+        disk_array.read(out=out_buffer)
+        self.assertEqual(out_buffer.dtype, numpy.dtype(dtype))
+        # can't use assert_array_equal since byteorders are different
+        allequal(out_buffer, array)
+
     def test_read_contiguous_slice1(self):
         array, disk_array = self.create_array()
         out_buffer = numpy.arange(self.size, dtype='f8')

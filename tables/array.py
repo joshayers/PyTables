@@ -12,16 +12,13 @@
 
 """Here is defined the Array class."""
 
-import sys
-
 import numpy
 
 from tables import hdf5Extension
 from tables.filters import Filters
 from tables.flavor import flavor_of, array_as_internal, internal_to_flavor
 
-from tables.utils import (is_idx, convertToNPAtom2, SizeType, lazyattr,
-                          byteorders)
+from tables.utils import is_idx, convertToNPAtom2, SizeType, lazyattr
 from tables.leaf import Leaf
 
 
