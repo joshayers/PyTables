@@ -386,13 +386,14 @@ very small/large chunksize, you may want to increase/decrease it."""
 
         if warn_negstep and step and step < 0 :
             raise ValueError("slice step cannot be negative")
-        # (start, stop, step) = slice(start, stop, step).indices(nrows)
+#         print 'input', start, stop, step, nrows
+#         (start, stop, step) = slice(start, stop, step).indices(nrows)
         # The next function is a substitute for slice().indices in order to
         # support full 64-bit integer for slices even in 32-bit machines.
         # F. Alted 2005-05-08
         (start, stop, step) = utilsExtension.getIndices(
             start, stop, step, long(nrows) )
-
+#         print 'output', start, stop, step
         return (start, stop, step)
 
 
@@ -440,6 +441,7 @@ very small/large chunksize, you may want to increase/decrease it."""
             title = self._v_title
         if filters is None:  filters = self.filters
 
+        import pdb; pdb.set_trace()
         # Create a copy of the object.
         (newNode, bytes) = self._g_copyWithStats(
             newParent, newName, start, stop, step,

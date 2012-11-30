@@ -2661,6 +2661,7 @@ class Table(tableExtension.Table, Leaf):
         sortby = kwargs.pop('sortby', None)
         propindexes = kwargs.pop('propindexes', False)
         checkCSI = kwargs.pop('checkCSI', False)
+        import pdb; pdb.set_trace()
         # Compute the correct indices.
         (start, stop, step) = self._processRangeRead(
             start, stop, step, warn_negstep = sortby is None)
