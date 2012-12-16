@@ -363,9 +363,6 @@ class Basic32DTestCase(BasicTestCase):
     tupleChar = numpy.array(["121"], dtype="S3"); tupleChar.shape = (1,)*32
 
 
-# TODO
-# add tests with time datatype and non-system byteorder, since byteorder is
-# converted manually in _readArray
 class ReadOutArgumentTests(unittest.TestCase):
 
     def setUp(self):

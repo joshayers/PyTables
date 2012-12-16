@@ -49,11 +49,10 @@ from tables.atom import Atom
 from tables.description import descr_from_dtype
 
 from tables.utilsExtension import (encode_filename, setBloscMaxThreads,
-  AtomToHDF5Type, AtomFromHDF5Type,
-  HDF5ToNPExtType, createNestedType)
+                                   AtomFromHDF5Type, HDF5ToNPExtType)
 
-
-from utilsExtension cimport malloc_dims, get_native_type
+from utilsExtension cimport (malloc_dims, get_native_type, AtomToHDF5Type,
+                             createNestedType)
 
 
 # Types, constants, functions, classes & other objects from everywhere
@@ -61,7 +60,7 @@ from libc.stdlib cimport malloc, free
 from libc.string cimport strdup, strlen
 from numpy cimport import_array, ndarray
 from cpython cimport (PyBytes_AsString, PyBytes_FromStringAndSize,
-    PyBytes_Check)
+                      PyBytes_Check)
 from cpython.unicode cimport PyUnicode_DecodeUTF8
 
 
@@ -1444,17 +1443,12 @@ cdef class Array(Leaf):
     if ret < 0:
       raise HDF5ExtError("Problems reading the array data.")
 
-    if use_sys_byteorder and self.atom.kind == 'time':
-      # Swap the byteorder by hand (this is not currently supported by HDF5)
-      if H5Tget_order(self.type_id) != platform_byteorder:
+    if self.atom.kind == 'time':
+      if self.atom.type == 'time64':
+          self._convertTime64(nparr, 1)
+      if byteorders[nparr.dtype.byteorder] != byteorders[self.dtype.byteorder]:
+        # Swap the byteorder by hand (this is not currently supported by HDF5)
         nparr.byteswap(True)
-
-    # Convert some HDF5 types to NumPy after reading.
-    if self.atom.type == 'time64':
-      self._convertTime64(nparr, 1)
-
-    return
-
 
   def _g_readSlice(self, ndarray startl, ndarray stopl, ndarray stepl,
                    ndarray nparr):

@@ -19,3 +19,7 @@ from definitions cimport hsize_t, hid_t
 
 cdef hsize_t *malloc_dims(object)
 cdef hid_t get_native_type(hid_t) nogil
+
+cpdef hid_t AtomToHDF5Type(atom, str byteorder) except -1
+cpdef hid_t createNestedType(object desc, str byteorder) except -1
+cpdef hid_t createNestedTypeMatchByteorder(object desc, object dtype) except -1

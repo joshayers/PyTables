@@ -1,5 +1,6 @@
 # Dirs
 build/
+tmp/
 doc/build/
 .ropeproject/
 

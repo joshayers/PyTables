@@ -338,11 +338,61 @@ class CompareTestCase(common.PyTablesTestCase):
 
         self.assertEqual(recarr['t32col'][0], int(wtime),
                          "Stored and retrieved values do not match.")
+        comp = (recarr['t64col'][0] == numpy.array((wtime, wtime)))
+        self.assertTrue(numpy.alltrue(comp),
+                        "Stored and retrieved values do not match.")
+
+    def test02_CompareTable_read_out_arg(self):
+        wtime = 1234567890.123456
+
+        # Create test Table with data.
+        h5file = tables.openFile(
+                self.h5fname, 'w', title = "Test for comparing Time tables")
+        tbl = h5file.createTable('/', 'test', self.MyTimeRow)
+        row = tbl.row
+        row['t32col'] = int(wtime)
+        row['t64col'] = (wtime, wtime)
+        row.append()
+        h5file.close()
+
+        # Check the written data.
+        h5file = tables.openFile(self.h5fname)
+        recarr = numpy.empty((1, ), h5file.root.test.dtype)
+        h5file.root.test.read(0, out=recarr)
+        h5file.close()
+
+        self.assertEqual(recarr['t32col'][0], int(wtime),
+                         "Stored and retrieved values do not match.")
 
         comp = (recarr['t64col'][0] == numpy.array((wtime, wtime)))
         self.assertTrue(numpy.alltrue(comp),
                         "Stored and retrieved values do not match.")
 
+    def test02_CompareTable_read_out_arg_non_sys_byteorder(self):
+        wtime = 1234567890.123456
+
+        # Create test Table with data.
+        h5file = tables.openFile(
+                self.h5fname, 'w', title = "Test for comparing Time tables")
+        tbl = h5file.createTable('/', 'test', self.MyTimeRow)
+        row = tbl.row
+        row['t32col'] = int(wtime)
+        row['t64col'] = (wtime, wtime)
+        row.append()
+        h5file.close()
+
+        # Check the written data.
+        h5file = tables.openFile(self.h5fname)
+        recarr = numpy.empty((1, ), h5file.root.test.dtype.newbyteorder())
+        h5file.root.test.read(0, out=recarr)
+        h5file.close()
+
+        self.assertEqual(recarr['t32col'][0], int(wtime),
+                         "Stored and retrieved values do not match.")
+
+        comp = (recarr['t64col'][0] == numpy.array((wtime, wtime)))
+        self.assertTrue(numpy.alltrue(comp),
+                        "Stored and retrieved values do not match.")
 
     def test02b_CompareTable(self):
         "Comparing several written and read time values in a Table."
@@ -388,6 +438,77 @@ class CompareTestCase(common.PyTablesTestCase):
         self.assertTrue(allequal(recarr['t64col'][:], orig_val, numpy.float64),
                         "Stored and retrieved values do not match.")
 
+    def test02b_CompareTable_out_arg(self):
+        # Create test Table with data.
+        h5file = tables.openFile(
+                self.h5fname, 'w', title = "Test for comparing Time tables")
+        tbl = h5file.createTable('/', 'test', self.MyTimeRow)
+
+        # Size of the test.
+        nrows = tbl.nrowsinbuf + 34  # Add some more rows than buffer.
+        row = tbl.row
+        for i in xrange(nrows):
+            row['t32col'] = i
+            j = i*2
+            row['t64col'] = (j+0.012, j+1+0.012)
+            row.append()
+        h5file.close()
+
+        # Check the written data.
+        h5file = tables.openFile(self.h5fname)
+        recarr = numpy.empty((nrows, ), h5file.root.test.dtype)
+        h5file.root.test.read(out=recarr)
+        h5file.close()
+
+        # Time32 column.
+        orig_val = numpy.arange(nrows, dtype=numpy.int32)
+        self.assertTrue(numpy.alltrue(recarr['t32col'][:] == orig_val),
+                        "Stored and retrieved values do not match.")
+
+        # Time64 column.
+        orig_val = numpy.arange(0, nrows*2, dtype=numpy.int32) + 0.012
+        orig_val.shape = (nrows, 2)
+        if common.verbose:
+            print "Original values:", orig_val
+            print "Retrieved values:", recarr['t64col'][:]
+        self.assertTrue(allequal(recarr['t64col'][:], orig_val, numpy.float64),
+                        "Stored and retrieved values do not match.")
+
+    def test02b_CompareTable_out_arg_non_sys_byteorder(self):
+        # Create test Table with data.
+        h5file = tables.openFile(
+                self.h5fname, 'w', title = "Test for comparing Time tables")
+        tbl = h5file.createTable('/', 'test', self.MyTimeRow)
+
+        # Size of the test.
+        nrows = tbl.nrowsinbuf + 34  # Add some more rows than buffer.
+        row = tbl.row
+        for i in xrange(nrows):
+            row['t32col'] = i
+            j = i*2
+            row['t64col'] = (j+0.012, j+1+0.012)
+            row.append()
+        h5file.close()
+
+        # Check the written data.
+        h5file = tables.openFile(self.h5fname)
+        recarr = numpy.empty((nrows, ), h5file.root.test.dtype.newbyteorder())
+        h5file.root.test.read(out=recarr)
+        h5file.close()
+
+        # Time32 column.
+        orig_val = numpy.arange(nrows, dtype=numpy.int32)
+        self.assertTrue(numpy.alltrue(recarr['t32col'][:] == orig_val),
+                        "Stored and retrieved values do not match.")
+
+        # Time64 column.
+        orig_val = numpy.arange(0, nrows*2, dtype=numpy.int32) + 0.012
+        orig_val.shape = (nrows, 2)
+        if common.verbose:
+            print "Original values:", orig_val
+            print "Retrieved values:", recarr['t64col'][:]
+        self.assertTrue(allequal(recarr['t64col'][:], orig_val, numpy.float64),
+                        "Stored and retrieved values do not match.")
 
     def test03_Compare64EArray(self):
         "Comparing written 64-bit time data with read data in an EArray."
@@ -443,6 +564,57 @@ class CompareTestCase(common.PyTablesTestCase):
         self.assertTrue(allequal(arr, orig_val),
                         "Stored and retrieved values do not match.")
 
+    def test03b_Compare64EArray_out_arg(self):
+        # Create test EArray with data.
+        h5file = tables.openFile(
+                self.h5fname, 'w', title = "Test for comparing Time64 E arrays")
+        ea = h5file.createEArray(
+                '/', 'test', tables.Time64Atom(), shape=(0, 2))
+
+        # Size of the test.
+        nrows = ea.nrowsinbuf + 34  # Add some more rows than buffer.
+
+        for i in xrange(nrows):
+            j = i * 2
+            ea.append(((j + 0.012, j + 1 + 0.012),))
+        h5file.close()
+
+        # Check the written data.
+        h5file = tables.openFile(self.h5fname)
+        arr = numpy.empty((nrows, 2), h5file.root.test.dtype)
+        h5file.root.test.read(out=arr)
+        h5file.close()
+
+        orig_val = numpy.arange(0, nrows*2, dtype=numpy.int32) + 0.012
+        orig_val.shape = (nrows, 2)
+        self.assertTrue(allequal(arr, orig_val),
+                        "Stored and retrieved values do not match.")
+
+    def test03b_Compare64EArray_out_arg_non_sys_byteorder(self):
+        # Create test EArray with data.
+        h5file = tables.openFile(
+                self.h5fname, 'w', title = "Test for comparing Time64 E arrays")
+        ea = h5file.createEArray(
+                '/', 'test', tables.Time64Atom(), shape=(0, 2))
+
+        # Size of the test.
+        nrows = ea.nrowsinbuf + 34  # Add some more rows than buffer.
+
+        for i in xrange(nrows):
+            j = i * 2
+            ea.append(((j + 0.012, j + 1 + 0.012),))
+        h5file.close()
+
+        # Check the written data.
+        h5file = tables.openFile(self.h5fname)
+        arr = numpy.empty((nrows, 2), h5file.root.test.dtype.newbyteorder())
+        h5file.root.test.read(out=arr)
+        h5file.close()
+
+        orig_val = numpy.arange(0, nrows*2, dtype=numpy.int32) + 0.012
+        orig_val.shape = (nrows, 2)
+        self.assertTrue(allequal(arr, orig_val),
+                        "Stored and retrieved values do not match.")
 
 
 class UnalignedTestCase(common.PyTablesTestCase):

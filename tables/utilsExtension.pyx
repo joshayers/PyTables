@@ -875,6 +875,20 @@ def enumToHDF5(object enumAtom, str byteorder):
 
 
 cpdef hid_t AtomToHDF5Type(atom, str byteorder) except -1:
+  """Convert a PyTables Atom to an HDF5 datatype.
+
+  Parameters
+  ----------
+  atom : tables.Atom
+      The atom to be converted
+  byteorder : {'big', 'little', 'irrelevant'}
+      The desired byteorder of the HDF5 type.
+
+  Returns
+  -------
+  hdf5_type : int
+      The HDF5 datatype identifier.
+  """
   cdef hid_t   tid = -1
   cdef hsize_t *dims = NULL
   cdef bytes   encoded_byteorder

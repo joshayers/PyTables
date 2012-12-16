@@ -29,12 +29,12 @@ from time import time
 from tables.description import Col
 from tables.exceptions import HDF5ExtError
 from tables.conditions import call_on_recarr
-from tables.utilsExtension import (getNestedField, AtomFromHDF5Type,
-                                   createNestedType,
-                                   createNestedTypeMatchByteorder)
+from tables.utilsExtension import getNestedField, AtomFromHDF5Type
+
 from tables.utils import SizeType
 
-from utilsExtension cimport get_native_type
+from utilsExtension cimport (get_native_type, createNestedType,
+                             createNestedTypeMatchByteorder)
 
 # numpy functions & objects
 from hdf5Extension cimport Leaf
