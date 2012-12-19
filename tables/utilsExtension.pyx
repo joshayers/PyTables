@@ -646,7 +646,7 @@ def whichClass(hid_t loc_id, str name):
   return classId
 
 
-def getNestedField(recarray, fieldname):
+cpdef getNestedField(recarray, fieldname):
   """Get the maybe nested field named `fieldname` from the `recarray`.
 
   The `fieldname` may be a simple field name or a nested field name
